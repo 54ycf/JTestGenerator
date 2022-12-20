@@ -51,10 +51,10 @@ public class PathUtil {
                 List<Unit> initAssigns = new ArrayList<>();
                 //被调用者的body
                 Body invokedBody = SootCFG.getMethodBody(invokeExpr.getMethod().getDeclaringClass().getName(), invokeExpr.getMethod().getSignature());
-                Value caller = getCaller(jInvokeStmt.getInvokeExprBox().getValue());//是哪个主体调用的这个，方便重命名
+                Value callerVal = getCaller(jInvokeStmt.getInvokeExprBox().getValue());//是哪个主体调用的这个，方便重命名
                 for (Local local : invokedBody.getLocals()) {
-                    local.setName(caller + "X" + local.getName());
-                    System.out.println(local.getName());
+                    local.setName(callerVal + "X" + local.getName());
+                    System.out.println("加X " + local.getName());
                 }
                 List<Value> args = invokeExpr.getArgs();/*调用的实参*/
                 for (int j = 0; j < args.size(); j++)
@@ -80,14 +80,14 @@ public class PathUtil {
 
             //最后的返回值要保存
             if (unit instanceof JAssignStmt && ((JAssignStmt) unit).containsInvokeExpr()) {
-                getCaller(((JAssignStmt) unit).getInvokeExprBox().getValue());
+                Value callerVal = getCaller(((JAssignStmt) unit).getInvokeExprBox().getValue());
                 InvokeExpr invokeExpr = ((JAssignStmt) unit).getInvokeExpr();  //r2.<cut.LogicStructure: int crazyFun(int,int)>(i9, i1)
                 Value caller = ((JAssignStmt) unit).getLeftOp(); //赋值语句的左侧，用于存储返回值
                 Body invokedBody = SootCFG.getMethodBody(invokeExpr.getMethod().getDeclaringClass().getName(), invokeExpr.getMethod().getSignature());
                 List<Unit> initAssigns = new ArrayList<>();
                 for (Local local : invokedBody.getLocals()) {
-                    local.setName(caller + "X" + local.getName());
-                    System.out.println(local.getName());
+                    local.setName(callerVal + "X" + local.getName());
+                    System.out.println("加X" + local.getName());
                 }
                 System.out.println(invokedBody);
                 List<Value> args = invokeExpr.getArgs();
@@ -118,10 +118,12 @@ public class PathUtil {
     private static Value getCaller(Value jInvokeValue) {
         if (jInvokeValue instanceof JSpecialInvokeExpr) {
             JSpecialInvokeExpr jSpecialInvokeExpr = (JSpecialInvokeExpr) jInvokeValue;
-            return jSpecialInvokeExpr.getBase();
+            System.out.println("特别调用" + jSpecialInvokeExpr.getBaseBox().getValue());
+            return jSpecialInvokeExpr.getBaseBox().getValue();
         } else if (jInvokeValue instanceof JVirtualInvokeExpr) {
             JVirtualInvokeExpr jVirtualInvokeExpr = (JVirtualInvokeExpr) jInvokeValue;
-            return jVirtualInvokeExpr.getBase();
+            System.out.println("虚拟调用" + jVirtualInvokeExpr.getBaseBox().getValue());
+            return jVirtualInvokeExpr.getBaseBox().getValue();
         }
         return null; //TODO 目前只处理了两种invoke
     }

@@ -130,33 +130,36 @@ public class SimpleGenerator {
 
                 System.out.println("左边： " + leftOpStr);
                 System.out.println("右边： " + rightOpStr);
-                //先预处理右边的符号
+                //先预处理右边的符号，lengthof、new、数组引用
                 rightOpStr = preHandleRightVal(leftOp, rightOp);
                 //再预处理左侧表达式
                 leftOpStr = preHandleLeftVal(leftOp);
                 System.out.println("左边处理： " + leftOpStr);
                 System.out.println("右边处理： " + rightOpStr);
 
-                //最后正式在处理变量的具体表示，如：r0 = r1 + r2
-                StringBuilder detailRightOp = new StringBuilder();
-                for (String s : rightOpStr.split("\\s+")) {
-                    if (assignList.containsKey(s)) {
-                        s = "(" + assignList.get(s) + ")";
-                    }
-                    detailRightOp.append(s); //将右侧的语句化简成最简单
-                }
-                System.out.println(leftOpStr + "  <-->  " + detailRightOp.toString());
-                assignList.put(leftOpStr, detailRightOp.toString());
+
+                System.out.println(leftOpStr + "  <-->  " + rightOpStr);
+                assignList.put(leftOpStr, rightOpStr);
                 continue;
             }
             //if判断
             if (stmt instanceof JIfStmt) {
                 String ifstmt = ((JIfStmt) stmt).getCondition().toString();
-                for (Map.Entry<String, String> entry : assignList.entrySet()) {
-                    System.out.println("替换前：" + ifstmt);
-                    ifstmt = ifstmt.replace(entry.getKey(), entry.getValue()); //条件化简
-                    System.out.println("替换后：" + ifstmt);
+//                for (Map.Entry<String, String> entry : assignList.entrySet()) {
+//                    System.out.println("替换前：" + ifstmt);
+//                    ifstmt = ifstmt.replace(entry.getKey(), entry.getValue()); //条件化简，这个替换方式不对！
+//                    System.out.println("替换后：" + ifstmt);
+//                }
+                String[] split = ifstmt.split("\\s+"); //换一种化简方式
+                String ifstmtStr= "";
+                for (String s : split) {
+                    if (assignList.containsKey(s)) {
+                        s = assignList.get(s);
+                    }
+                    ifstmtStr = ifstmtStr + s + " ";
                 }
+                ifstmt = ifstmtStr;
+                System.out.println("替换条件后" + ifstmtStr);
                 int nextUnitIndex = path.indexOf(stmt) + 1;
                 Unit nextUnit = path.get(nextUnitIndex);
                 //如果ifstmt的后继语句不是ifstmt中goto语句，说明ifstmt中的条件为假
@@ -203,11 +206,20 @@ public class SimpleGenerator {
     private String preHandleLeftVal(Value leftOp) throws Exception {
         if (leftOp instanceof JArrayRef) {
             JArrayRef jArrayRef = (JArrayRef) leftOp;
-            return handleArrInd(jArrayRef, assignList);
+            return handleArrInd(jArrayRef);
         }else if (leftOp instanceof JInstanceFieldRef) {
             JInstanceFieldRef jInstanceFieldRef = (JInstanceFieldRef) leftOp;
             String baseStr = jInstanceFieldRef.getBase().toString();
+            String[] cutBaseStr = baseStr.split("X");
+            if (assignList.containsKey(cutBaseStr[0])) {
+                System.out.println(cutBaseStr[0] + "左边头头");
+                cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
+            }
+            baseStr = cutBaseStr[0] + cutBaseStr[1];
+            System.out.println("field的baseStr修改为" + baseStr);
             return baseStr + "_" + jInstanceFieldRef.getField().getName();
+        }else if(leftOp instanceof JimpleLocal){
+            return extendFullObjName(leftOp);
         }else {
             return leftOp.toString();
         }
@@ -222,7 +234,11 @@ public class SimpleGenerator {
             return op + "_len";
         } else if (rightOp instanceof JArrayRef) { //数组引用
             JArrayRef jArrayRef = (JArrayRef) rightOp;
-            return handleArrInd(jArrayRef, assignList);
+            String arrExpr = handleArrInd(jArrayRef);
+            if (assignList.containsKey(arrExpr)) {
+                arrExpr = assignList.get(arrExpr);
+            }
+            return arrExpr;
         } else if (rightOp instanceof JNewArrayExpr) {
             JNewArrayExpr jNewArrayExpr = (JNewArrayExpr) rightOp;
             String rightOpStr = "newArr_" + jNewArrayExpr.getBaseType().toString() +  StaticsUtil.genMark(); //TODO 这个baseType可能是包含.，这个符号不支持z3，需要修改
@@ -240,22 +256,53 @@ public class SimpleGenerator {
         } else if (rightOp instanceof JInstanceFieldRef) {
             JInstanceFieldRef jInstanceFieldRef = (JInstanceFieldRef) rightOp;
             String baseStr = jInstanceFieldRef.getBase().toString();
-            if (assignList.containsKey(baseStr)) {
-                baseStr = assignList.get(baseStr);
+            String[] cutBaseStr = baseStr.split("X");
+            if (assignList.containsKey(cutBaseStr[0])) {
+                System.out.println(cutBaseStr[0] + "头头");
+                cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
             }
-            return baseStr + "_" + jInstanceFieldRef.getField().getName();
+            baseStr = cutBaseStr[0] + cutBaseStr[1];
+            System.out.println("field的baseStr修改为" + baseStr);
+            String fullStr =  baseStr + "_" + jInstanceFieldRef.getField().getName();
+            if (assignList.containsKey(fullStr)) {
+                fullStr = assignList.get(fullStr);
+            }
+            return fullStr;
+        }else if(rightOp instanceof AbstractJimpleFloatBinopExpr){
+            //最后正式在处理变量的具体表示，如：r0 = r1 + r2
+            StringBuilder detailRightOp = new StringBuilder();
+            for (String s : rightOp.toString().split("\\s+")) {
+                if (assignList.containsKey(s)) {
+                    s = " ( " + assignList.get(s) + " ) "; //每次put加括号也可能有问题，比如对象.属性，这个就变成了(对象).属性
+                }
+                detailRightOp.append(s); //将右侧的语句化简成最简单
+            }
+            return detailRightOp.toString();
+        }else if(rightOp instanceof JimpleLocal){
+            String rightOpStr = extendFullObjName(rightOp);
+            if (assignList.containsKey(rightOpStr)) {
+                return assignList.get(rightOpStr);
+            }
+            return rightOpStr;
         }else {
             return rightOp.toString();
         }
     }
+    private String extendFullObjName(Value value){
+        if (value.toString().contains("X")) {
+            String[] cutBaseStr = value.toString().split("X");
+            cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
+            return cutBaseStr[0] + cutBaseStr[1];
+        }
+        return value.toString();
+    }
     /**
      * 处理数组变量的符号
      * @param jArrayRef
-     * @param assignList
      * @return
      * @throws Exception
      */
-    private String handleArrInd(JArrayRef jArrayRef, Map<String,String> assignList) throws Exception {
+    private String handleArrInd(JArrayRef jArrayRef) throws Exception {
         String baseStr = jArrayRef.getBase().toString();
         if (assignList.containsKey(baseStr)) {
             baseStr = assignList.get(baseStr);
