@@ -1,4 +1,5 @@
 import jtg.generator.GeneralGenerator;
+import jtg.generator.StmtCovGenerator;
 import jtg.generator.path.DDLPrimePathCal;
 import org.junit.jupiter.api.Test;
 import soot.Unit;
@@ -17,7 +18,7 @@ public class JianDanTest {
         String clsName = "cut.LogicStructure";
         String methodName = "pat";
         DDLPrimePathCal cal = new DDLPrimePathCal(clspath, clsName, methodName);
-        List<List<Unit>> lists = cal.generatePrimePathUnit();
+        Set<List<Unit>> lists = cal.generatePrimePathUnit();
         int i = 0;
         for (List<Unit> list : lists) {
             System.out.println("***************prime path " + i++ + "**************");
@@ -32,9 +33,9 @@ public class JianDanTest {
     public void testInsertBefore(){
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
-        String methodName = "pat";
-        GeneralGenerator gg = new GeneralGenerator(clspath, clsName, methodName);
-        gg.generate();
+        String methodName = "multipleIf";
+//        GeneralGenerator gg = new GeneralGenerator(clspath, clsName, methodName);
+//        gg.generate();
     }
 
     //我的方法生成的
@@ -43,7 +44,15 @@ public class JianDanTest {
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
         String methodName = "multipleIf";
-        GeneralGenerator gg = new GeneralGenerator(clspath, clsName, methodName);
-        gg.generate();
+//        GeneralGenerator gg = new GeneralGenerator(clspath, clsName, methodName);
+//        gg.generate();
+    }
+    @Test
+    public void testStmtCov(){
+        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
+        String clsName = "cut.LogicStructure";
+        String methodName = "loopAll";
+        StmtCovGenerator generator = new StmtCovGenerator(clspath, clsName, methodName);
+        generator.generate();
     }
 }

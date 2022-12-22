@@ -16,10 +16,7 @@ import soot.toolkits.graph.ClassicCompleteUnitGraph;
 import soot.toolkits.graph.UnitGraph;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,9 +73,9 @@ public class SimpleGenerator {
         System.out.println("============================================================================");
         System.out.println("Generating test case inputs for method: " + clsName + "." + mtdName + "()");
         System.out.println("============================================================================");
-        System.out.println("老body\n" + body);
+//        System.out.println("老body\n" + body);
         PathUtil.extendCFG(body);
-        System.out.println("新body\n" + body);
+//        System.out.println("新body\n" + body);
         ug = new ClassicCompleteUnitGraph(body); //扩展后的图
         Visualizer.printCFGDot("test_new_invoke", ug, false);
         System.out.println("#######################################################");
@@ -128,34 +125,23 @@ public class SimpleGenerator {
                 String leftOpStr = leftOp.toString();
                 String rightOpStr = rightOp.toString();
 
-                System.out.println("左边： " + leftOpStr);
-                System.out.println("右边： " + rightOpStr);
                 //先预处理右边的符号，lengthof、new、数组引用
                 rightOpStr = preHandleRightVal(leftOp, rightOp);
                 //再预处理左侧表达式
                 leftOpStr = preHandleLeftVal(leftOp);
-                System.out.println("左边处理： " + leftOpStr);
-                System.out.println("右边处理： " + rightOpStr);
 
 
-                System.out.println(leftOpStr + "  <-->  " + rightOpStr);
+//                System.out.println(leftOpStr + "  <-->  " + rightOpStr);
                 assignList.put(leftOpStr, rightOpStr);
                 continue;
             }
             //if判断
             if (stmt instanceof JIfStmt) {
                 String ifstmt = ((JIfStmt) stmt).getCondition().toString();
-//                for (Map.Entry<String, String> entry : assignList.entrySet()) {
-//                    System.out.println("替换前：" + ifstmt);
-//                    ifstmt = ifstmt.replace(entry.getKey(), entry.getValue()); //条件化简，这个替换方式不对！
-//                    System.out.println("替换后：" + ifstmt);
-//                }
                 String[] split = ifstmt.split("\\s+"); //换一种化简方式
                 String ifstmtStr= "";
                 for (String s : split) {
-                    if (assignList.containsKey(s)) {
-                        s = assignList.get(s);
-                    }
+                    s = Optional.ofNullable(assignList.get(s)).orElse(s);
                     ifstmtStr = ifstmtStr + s + " ";
                 }
                 ifstmt = ifstmtStr;
@@ -209,15 +195,7 @@ public class SimpleGenerator {
             return handleArrInd(jArrayRef);
         }else if (leftOp instanceof JInstanceFieldRef) {
             JInstanceFieldRef jInstanceFieldRef = (JInstanceFieldRef) leftOp;
-            String baseStr = jInstanceFieldRef.getBase().toString();
-            String[] cutBaseStr = baseStr.split("X");
-            if (assignList.containsKey(cutBaseStr[0])) {
-                System.out.println(cutBaseStr[0] + "左边头头");
-                cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
-            }
-            baseStr = cutBaseStr[0] + cutBaseStr[1];
-            System.out.println("field的baseStr修改为" + baseStr);
-            return baseStr + "_" + jInstanceFieldRef.getField().getName();
+            return extendFullObjName(jInstanceFieldRef.getBase()) + "_" + jInstanceFieldRef.getField().getName();
         }else if(leftOp instanceof JimpleLocal){
             return extendFullObjName(leftOp);
         }else {
@@ -228,24 +206,16 @@ public class SimpleGenerator {
         if (rightOp instanceof JLengthExpr) { //数组长度表达式
             JLengthExpr jLengthExpr = (JLengthExpr) rightOp;
             Value op = jLengthExpr.getOp(); //lengthof op
-            if (assignList.containsKey(op.toString())) {
-                return assignList.get(op) + "_len";
-            }
-            return op + "_len";
+            return Optional.ofNullable(assignList.get(op.toString())).orElse(op.toString()) + "_len";
         } else if (rightOp instanceof JArrayRef) { //数组引用
             JArrayRef jArrayRef = (JArrayRef) rightOp;
             String arrExpr = handleArrInd(jArrayRef);
-            if (assignList.containsKey(arrExpr)) {
-                arrExpr = assignList.get(arrExpr);
-            }
-            return arrExpr;
+            return Optional.ofNullable(assignList.get(arrExpr)).orElse(arrExpr);
         } else if (rightOp instanceof JNewArrayExpr) {
             JNewArrayExpr jNewArrayExpr = (JNewArrayExpr) rightOp;
             String rightOpStr = "newArr_" + jNewArrayExpr.getBaseType().toString() +  StaticsUtil.genMark(); //TODO 这个baseType可能是包含.，这个符号不支持z3，需要修改
             String leftOpStr = leftOp.toString();
-            if (assignList.containsKey(leftOpStr)) {
-                leftOpStr = assignList.get(leftOpStr);
-            }
+            leftOpStr = Optional.ofNullable(assignList.get(leftOpStr)).orElse(leftOpStr);
             assignList.put(leftOpStr + "_len", jNewArrayExpr.getSize().toString());//新建数组，初始化长度要用到
             return rightOpStr;
         } else if (rightOp instanceof JNewExpr) { //new 对象
@@ -255,19 +225,8 @@ public class SimpleGenerator {
             return rightOpStr;
         } else if (rightOp instanceof JInstanceFieldRef) {
             JInstanceFieldRef jInstanceFieldRef = (JInstanceFieldRef) rightOp;
-            String baseStr = jInstanceFieldRef.getBase().toString();
-            String[] cutBaseStr = baseStr.split("X");
-            if (assignList.containsKey(cutBaseStr[0])) {
-                System.out.println(cutBaseStr[0] + "头头");
-                cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
-            }
-            baseStr = cutBaseStr[0] + cutBaseStr[1];
-            System.out.println("field的baseStr修改为" + baseStr);
-            String fullStr =  baseStr + "_" + jInstanceFieldRef.getField().getName();
-            if (assignList.containsKey(fullStr)) {
-                fullStr = assignList.get(fullStr);
-            }
-            return fullStr;
+            String fullStr= extendFullObjName(jInstanceFieldRef.getBase()) + "_" + jInstanceFieldRef.getField().getName();
+            return Optional.ofNullable(assignList.get(fullStr)).orElse(fullStr);
         }else if(rightOp instanceof AbstractJimpleFloatBinopExpr){
             //最后正式在处理变量的具体表示，如：r0 = r1 + r2
             StringBuilder detailRightOp = new StringBuilder();
@@ -280,18 +239,21 @@ public class SimpleGenerator {
             return detailRightOp.toString();
         }else if(rightOp instanceof JimpleLocal){
             String rightOpStr = extendFullObjName(rightOp);
-            if (assignList.containsKey(rightOpStr)) {
-                return assignList.get(rightOpStr);
-            }
-            return rightOpStr;
+            return Optional.ofNullable(assignList.get(rightOpStr)).orElse(rightOpStr);
         }else {
             return rightOp.toString();
         }
     }
+
+    /**
+     * 将$r1Xi0扩展成newObj_jtg_Person123_i0
+     * @param value
+     * @return
+     */
     private String extendFullObjName(Value value){
         if (value.toString().contains("X")) {
             String[] cutBaseStr = value.toString().split("X");
-            cutBaseStr[0] = assignList.get(cutBaseStr[0]) + "_";
+            cutBaseStr[0] = Optional.ofNullable(assignList.get(cutBaseStr[0])).orElse(cutBaseStr[0]) + "_";
             return cutBaseStr[0] + cutBaseStr[1];
         }
         return value.toString();
@@ -304,9 +266,7 @@ public class SimpleGenerator {
      */
     private String handleArrInd(JArrayRef jArrayRef) throws Exception {
         String baseStr = jArrayRef.getBase().toString();
-        if (assignList.containsKey(baseStr)) {
-            baseStr = assignList.get(baseStr);
-        }
+        baseStr = Optional.ofNullable(assignList.get(baseStr)).orElse(baseStr);
         String indStr = jArrayRef.getIndex().toString();
         String rightOpStr = "";
         if (assignList.containsKey(indStr)) { // 像r0[b0]这样b0是变量的索引，要归结到常量。如果b0是变量，就一定出现过赋值

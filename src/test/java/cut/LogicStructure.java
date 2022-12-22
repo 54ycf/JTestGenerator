@@ -21,12 +21,7 @@ public class LogicStructure {
             return false;
     }
 
-    public String multipleIf(int op) {
-        int[] arr = new int[10];
-        arr[0] = op;
-        arr[1] = arr[0] + 1;
-        Person person = new Person(arr[1], "Tom");
-        op = person.getAge();
+    public String multipleIf(int op, Person person) {
         if (op % 15 == 0)
             return "FizzBuzz";
         else if (op % 5 == 0)

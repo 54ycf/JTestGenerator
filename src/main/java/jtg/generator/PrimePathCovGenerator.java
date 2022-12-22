@@ -1,5 +1,7 @@
 package jtg.generator;
 
+import jtg.generator.path.DDLPrimePathCal;
+import jtg.generator.util.PathUtil;
 import soot.Body;
 import soot.Local;
 import soot.Unit;
@@ -8,9 +10,7 @@ import soot.jimple.internal.JIfStmt;
 import soot.jimple.internal.JReturnStmt;
 import soot.toolkits.graph.UnitGraph;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * 思路：
@@ -23,84 +23,28 @@ import java.util.List;
  *
  * 继续搞基路径，如果这条基路径在得到的路径里是某条完整路径子路径，则证明已经搞定，否则继续搞
  */
-public class PrimePathCovGenerator {
-    private UnitGraph ug;
-    private Body body;
-    private List<Local> jimpleVars;
+public class PrimePathCovGenerator extends GeneralGenerator{
 
-    public PrimePathCovGenerator(Body body, UnitGraph ug) {
-        this.body = body;
-        this.ug = ug;
-        jimpleVars = getJVars();
+    public PrimePathCovGenerator(String classPath, String className, String methodName) {
+        super(classPath, className, methodName);
     }
 
-    private List<Local> getJVars() {
-        //Jimple自身增加的Locals，不是被测代码真正的变量
-        ArrayList<Local> jimpleVars = new ArrayList<Local>();
-        for (Local l : body.getLocals()) {
-            if (l.toString().startsWith("$")) jimpleVars.add(l);
-        }
-        return jimpleVars;
+    @Override
+    void init() {
+        DDLPrimePathCal primePathCal = new DDLPrimePathCal(clsPath, clsName, mtdName);
+        initSet = new HashSet<>(primePathCal.generatePrimePathUnit()); //初始集合是所有的基路径
+        solvableSet = new HashSet<>();
+        unsolvableSet = new HashSet<>();
+        testData = new HashSet<>();
     }
 
-    public String calPathConstraint(List<Unit> path) {
-        List<Local> jVars = getJVars();
+    @Override
+    Set<List<Unit>> calAllFullCandidate(Object o) {
+        return null;
+    }
 
-        String pathConstraint = "";
-        String expectedResult = "";
+    @Override
+    void checkOtherIfCov(List<Unit> fullPath) {
 
-        HashMap<String, String> assignList = new HashMap<>();
-        ArrayList<String> stepConditionsWithJimpleVars = new ArrayList<String>();
-        ArrayList<String> stepConditions = new ArrayList<String>();
-
-        for (Unit stmt : path) {
-
-            if (stmt instanceof JAssignStmt) {
-                assignList.put(((JAssignStmt) stmt).getLeftOp().toString(), ((JAssignStmt) stmt).getRightOp().toString());
-                continue;
-            }
-            if (stmt instanceof JIfStmt) {
-
-                String ifstms = ((JIfStmt) stmt).getCondition().toString();
-                int nextUnitIndex = path.indexOf(stmt) + 1;
-                Unit nextUnit = path.get(nextUnitIndex);
-
-                //如果ifstmt的后继语句不是ifstmt中goto语句，说明ifstmt中的条件为假
-                if (!((JIfStmt) stmt).getTarget().equals(nextUnit))
-                    ifstms = "!( " + ifstms + " )";
-                else
-                    ifstms = "( " + ifstms + " )";
-                stepConditionsWithJimpleVars.add(ifstms);
-                continue;
-            }
-            if (stmt instanceof JReturnStmt) {
-                expectedResult = stmt.toString().replace("return", "").trim();
-            }
-        }
-        System.out.println("The step conditions with JimpleVars are: " + stepConditionsWithJimpleVars);
-
-        //bug 没有考虑jVars为空的情况
-        if (jVars.size() != 0) {
-            for (String cond : stepConditionsWithJimpleVars) {
-                //替换条件里的Jimple变量
-                for (Local lv : jVars) {
-                    if (cond.contains(lv.toString())) {
-                        stepConditions.add(cond.replace(lv.toString(), assignList.get(lv.toString()).trim()));
-                    }
-                }
-            }
-        } else
-            stepConditions = stepConditionsWithJimpleVars;
-
-        if (stepConditions.isEmpty())
-            return "";
-        pathConstraint = stepConditions.get(0);
-        int i = 1;
-        while (i < stepConditions.size()) {
-            pathConstraint = pathConstraint + " && " + stepConditions.get(i);
-            i++;
-        }
-        //System.out.println("The path expression is: " + pathConstraint);
-        return pathConstraint;
     }
 }

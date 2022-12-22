@@ -54,7 +54,6 @@ public class PathUtil {
                 Value callerVal = getCaller(jInvokeStmt.getInvokeExprBox().getValue());//是哪个主体调用的这个，方便重命名
                 for (Local local : invokedBody.getLocals()) {
                     local.setName(callerVal + "X" + local.getName());
-                    System.out.println("加X " + local.getName());
                 }
                 List<Value> args = invokeExpr.getArgs();/*调用的实参*/
                 for (int j = 0; j < args.size(); j++)
@@ -87,9 +86,7 @@ public class PathUtil {
                 List<Unit> initAssigns = new ArrayList<>();
                 for (Local local : invokedBody.getLocals()) {
                     local.setName(callerVal + "X" + local.getName());
-                    System.out.println("加X" + local.getName());
                 }
-                System.out.println(invokedBody);
                 List<Value> args = invokeExpr.getArgs();
                 for (int j = 0; j < args.size(); j++)
                     initAssigns.add(new JAssignStmt(args.get(j), invokedBody.getParameterLocal(j)));//调用将实参赋值
@@ -118,11 +115,9 @@ public class PathUtil {
     private static Value getCaller(Value jInvokeValue) {
         if (jInvokeValue instanceof JSpecialInvokeExpr) {
             JSpecialInvokeExpr jSpecialInvokeExpr = (JSpecialInvokeExpr) jInvokeValue;
-            System.out.println("特别调用" + jSpecialInvokeExpr.getBaseBox().getValue());
             return jSpecialInvokeExpr.getBaseBox().getValue();
         } else if (jInvokeValue instanceof JVirtualInvokeExpr) {
             JVirtualInvokeExpr jVirtualInvokeExpr = (JVirtualInvokeExpr) jInvokeValue;
-            System.out.println("虚拟调用" + jVirtualInvokeExpr.getBaseBox().getValue());
             return jVirtualInvokeExpr.getBaseBox().getValue();
         }
         return null; //TODO 目前只处理了两种invoke
@@ -135,8 +130,9 @@ public class PathUtil {
         return result;
     }
 
+//    private Map<Unit, Integer> visitRecord = new HashMap<>();
     //向上或向下扩招到目的点
-    public void findPath(UnitGraph ug, Unit startU, Unit targetU, List<Unit> path, boolean back/*back true forward false*/) {
+    public void findPath(UnitGraph ug, Unit startU, Unit targetU, List<Unit> path, boolean back/*back true forward false*/, Map<Unit, Integer> visitRecord) {
         int threshold;
         List<Unit> nextUnits;
         if (back) {
@@ -146,17 +142,23 @@ public class PathUtil {
             threshold = StaticsUtil.MOST_FORWARD_FIND;
             nextUnits = ug.getSuccsOf(startU);
         }
-        if (result.size() >= threshold) //已经找到一定数量了，不用再找了
+        if (result.size() > threshold) //已经找到一定数量了，不用再找了
             return;
-        path.add(startU);
+        Map<Unit, Integer> visitRecordCopy = new HashMap<>(visitRecord);
+        visitRecordCopy.put(startU, Optional.ofNullable(visitRecordCopy.get(startU)).orElse(0)+1);
+        if (visitRecordCopy.get(startU) > StaticsUtil.MOST_LOOP) { //达到一定循环次数，不再找寻
+            return;
+        }
+        ArrayList<Unit> pathClone = new ArrayList<>(path); //克隆
+        pathClone.add(startU);
         //找到了目标
         if (startU.equals(targetU)) {
-            result.add(path);
+            result.add(pathClone);
+//            System.out.println("加入了一条path" + path);
             return;
         }
         for (Unit next : nextUnits) {
-            ArrayList<Unit> pathClone = new ArrayList<>(path); //克隆
-            findPath(ug, next, targetU, pathClone, back);
+            findPath(ug, next, targetU, pathClone, back, visitRecordCopy);
         }
     }
 }

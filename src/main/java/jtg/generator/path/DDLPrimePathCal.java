@@ -21,8 +21,8 @@ public class DDLPrimePathCal {
         bg = SootCFG.getSimpleCFG(clsPath, clsName, mtdName);
     }
 
-    public List<List<Unit>> generatePrimePathUnit(){
-        List<List<Unit>> result = new ArrayList<>();
+    public Set<List<Unit>> generatePrimePathUnit(){
+        Set<List<Unit>> result = new HashSet<>();
         List<List<Block>> primePathBlock = generatePrimePathBlock();
         for (List<Block> blocks : primePathBlock) {
             result.add(PathUtil.transferBp2Up(blocks));
