@@ -1,39 +1,22 @@
 package jtg.generator;
 
-import jtg.generator.path.DDLPrimePathCal;
 import jtg.generator.util.CommonUtil;
 import jtg.generator.util.PathUtil;
-import soot.Body;
-import soot.Local;
 import soot.Unit;
-import soot.jimple.internal.JAssignStmt;
-import soot.jimple.internal.JIfStmt;
-import soot.jimple.internal.JReturnStmt;
-import soot.toolkits.graph.UnitGraph;
+import soot.toolkits.graph.Block;
+import soot.toolkits.graph.BlockGraph;
+import soot.toolkits.graph.BriefBlockGraph;
 
 import java.util.*;
 
-/**
- * 思路：
- * 从最长的基路径开始搞
- * 向前DFS到开始节点结束
- * 向后DFS到结束节点，得到完整路径，求解约束
- * 如果有解，完整路径+1，测试数据+1
- * 如果无解，继续DFS，找到的Path数量+1
- * 重复以上两步骤，直到Path数量==N，放弃，并告诉此基路径不可解
- *
- * 继续搞基路径，如果这条基路径在得到的路径里是某条完整路径子路径，则证明已经搞定，否则继续搞
- */
-public class PrimePathCovGenerator extends GeneralGenerator{
-
-    public PrimePathCovGenerator(String classPath, String className, String methodName) {
+public class BranchCovGenerator extends GeneralGenerator{
+    public BranchCovGenerator(String classPath, String className, String methodName) {
         super(classPath, className, methodName);
     }
 
     @Override
     void init() {
-        DDLPrimePathCal primePathCal = new DDLPrimePathCal(body);
-        initSet = new HashSet<>(primePathCal.generatePrimePathUnit()); //初始集合是所有的基路径
+        initSet = new HashSet<>(calAllBranch());
         solvableSet = new HashSet<>();
         unsolvableSet = new HashSet<>(initSet);
         testData = new HashSet<>();
@@ -41,9 +24,9 @@ public class PrimePathCovGenerator extends GeneralGenerator{
 
     @Override
     Set<List<Unit>> calAllFullCandidate(Object o) {
-        List<Unit> primePath = (List)o;
-        Unit headOfPrimePath = primePath.get(0);
-        Unit tailOfPrimePath = primePath.get(primePath.size()-1);
+        List<Unit> brachPath = (List)o;
+        Unit headOfPrimePath = brachPath.get(0);
+        Unit tailOfPrimePath = brachPath.get(brachPath.size()-1);
         Set<List<Unit>> backwardPaths = new HashSet<>();
         Set<List<Unit>> forwardPaths = new HashSet<>();
         for (Unit head : heads) {
@@ -66,7 +49,7 @@ public class PrimePathCovGenerator extends GeneralGenerator{
                 List<Unit> backwardPathCopy = new ArrayList<>(backwardPath);
                 List<Unit> forwardPathCopy = new ArrayList<>(forwardPath); //注意不能直接操作
                 backwardPathCopy.remove(backwardPathCopy.size()-1); //首尾重合了
-                backwardPathCopy.addAll(primePath);
+                backwardPathCopy.addAll(brachPath);
                 forwardPathCopy.remove(0);
                 backwardPathCopy.addAll(forwardPathCopy);//拼接到一起
                 result.add(backwardPathCopy);
@@ -78,11 +61,28 @@ public class PrimePathCovGenerator extends GeneralGenerator{
     @Override
     void checkCov(List<Unit> fullPath) {
         for (Object o : unsolvableSet) {
-            List<Unit> primePath = (List<Unit>) o;
-            if (CommonUtil.leftIsSubList(primePath, fullPath)) {
-                solvableSet.add(primePath);
+            List<Unit> branchPath = (List<Unit>) o;
+            if (CommonUtil.leftIsSubList(branchPath, fullPath)) {
+                solvableSet.add(branchPath);
             }
         }
         unsolvableSet.removeAll(solvableSet);
+    }
+
+    /**计算所有的分支
+     * @return
+     */
+    private Set<List<Unit>> calAllBranch(){
+        BlockGraph bg = new BriefBlockGraph(body);
+        Set<List<Unit>> result = new HashSet<>();
+        for (Block block : bg.getBlocks()) {
+            for (Block suc : bg.getSuccsOf(block)) {
+                List<Unit> head = PathUtil.transferB2U(block);
+                head.addAll(PathUtil.transferB2U(suc));
+                result.add(head);
+            }
+
+        }
+        return result;
     }
 }

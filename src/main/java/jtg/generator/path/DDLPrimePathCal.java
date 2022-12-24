@@ -3,6 +3,7 @@ package jtg.generator.path;
 import jtg.generator.util.CommonUtil;
 import jtg.generator.util.PathUtil;
 import jtg.graphics.SootCFG;
+import soot.Body;
 import soot.Unit;
 import soot.toolkits.graph.Block;
 import soot.toolkits.graph.BlockGraph;
@@ -14,11 +15,11 @@ public class DDLPrimePathCal {
     private String clsName;
     private String mtdName;
     private BlockGraph bg;
-    public DDLPrimePathCal(String classPath, String className, String methodName) {
-        this.clsPath = classPath;
-        this.clsName = className;
-        this.mtdName = methodName;
-        bg = SootCFG.getSimpleCFG(clsPath, clsName, mtdName);
+    public DDLPrimePathCal(Body body) {
+//        this.clsPath = classPath;
+//        this.clsName = className;
+//        this.mtdName = methodName;
+        bg = SootCFG.getSimpleCFG(body);
     }
 
     public Set<List<Unit>> generatePrimePathUnit(){

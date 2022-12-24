@@ -15,15 +15,13 @@ public class StmtCovGenerator extends GeneralGenerator{
     void init() {
         initSet = new HashSet<>(body.getUnits());
         solvableSet = new HashSet<>();
-        unsolvableSet = new HashSet<>();
+        unsolvableSet = new HashSet<>(initSet);
         testData = new HashSet<>();
     }
 
     @Override
     Set<List<Unit>> calAllFullCandidate(Object o) {
         Unit stmtUnit = (Unit) o;
-        List<Unit> heads = ug.getHeads();
-        List<Unit> tails = ug.getTails();
         Set<List<Unit>> backwardPaths = new HashSet<>();
         Set<List<Unit>> forwardPaths = new HashSet<>();
         for (Unit head : heads) {
@@ -53,7 +51,7 @@ public class StmtCovGenerator extends GeneralGenerator{
     }
 
     @Override
-    void checkOtherIfCov(List<Unit> fullPath) {
+    void checkCov(List<Unit> fullPath) {
         solvableSet.addAll(fullPath); //这条路径覆盖的所有语句都加进去
         fullPath.forEach(unsolvableSet::remove); //在不可解集中的也减去
     }

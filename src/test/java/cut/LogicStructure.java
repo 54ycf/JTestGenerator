@@ -1,5 +1,6 @@
 package cut;
 
+import jtg.MyEnum;
 import jtg.Person;
 
 public class LogicStructure {
@@ -32,36 +33,54 @@ public class LogicStructure {
             return /*Integer.toString(op)*/"";
     }
 
-    public int loopAll(int op) {
+    //测试循环
+    public int test001(int op) {
         int sum = 0;
         for (int i = 0; i < op; i++) {
-            sum = sum + i;
+            sum += i;
         }
         return sum;
     }
 
-    public int loopAllWhile(int op){
-        int start = op;
-        int res = 0;
-        while (start > 0){
-            res = res * start;
-            start --;
+    //测试数组
+    public int test002(int[] arr) {
+        int sum = 0;
+        for (int i = 0; i < arr.length; i++) {
+            if (arr[i] > 0) {
+                sum += arr[i];
+            }else {
+                sum -= arr[i];
+            }
         }
-        res = res + 3;
-        return res;
+        return sum;
     }
 
-    public int switchCase(int op1, int op2) {
-        switch (op1) {
-            case 1:
-                op2 += 1;break;
-            case 2:
-                op2 += 2; break;
-            default:
-                op2 += -1; break;
+    //复杂类型的数组
+    public int test003(Person[] people) {
+        if (people[0].getAge() > 0) {
+            return people[0].getAge();
+        }else{
+            return people[1].getAge();
         }
-        op2 += 3;
-        return op2;
+    }
+
+    //测试函数调用
+    public int test004(boolean op) {
+        if (op ) {
+            return test001(1);
+        }else {
+            return test001(2);
+        }
+    }
+
+    public int test005(MyEnum myEnum) {
+        if (myEnum.equals(MyEnum.a)) {
+            return -1;
+        } else if (myEnum.equals(MyEnum.b)) {
+            return 1;
+        } else {
+            return 0;
+        }
     }
 
     public int pat(char[] subject, char[] pattern) {
@@ -73,7 +92,7 @@ public class LogicStructure {
         int patternLen = pattern.length;
         subjectLen = crazyFun(subjectLen,patternLen);
 //        subjectLen = new Integer(patternLen);
-        while (isPat == false ) {
+        while (isPat == false  && iSub+patternLen-1<subjectLen) {
             if (subject[iSub] == pattern[0]) {
                 rtnIndex = iSub;
                 isPat = true;
@@ -111,5 +130,11 @@ public class LogicStructure {
         }
     }
 
+    public int charTest(String str) {
+        if (str.equals("abc")) {
+            return 1;
+        }
+        return 2;
+    }
 }
 

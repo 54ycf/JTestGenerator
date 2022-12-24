@@ -22,8 +22,8 @@ public class SootCFG {
     }
 
     //块图
-    public static BlockGraph getSimpleCFG(String sourceDirectory, String clsName, String methodName){
-        Body body = getMethodBody(sourceDirectory,clsName,methodName);
+    public static BlockGraph getSimpleCFG(Body body){
+//        Body body = getMethodBody(sourceDirectory,clsName,methodName);
         BlockGraph bg = new BriefBlockGraph(body);
         return bg;
     }

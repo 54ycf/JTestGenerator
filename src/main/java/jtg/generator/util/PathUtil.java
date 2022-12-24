@@ -41,30 +41,32 @@ public class PathUtil {
         List<Unit> unitList = new ArrayList<>(units);//循环要更改列表，不能用foreach
         for (int i = 0; i < unitList.size(); i++) { //当被调用的加入到里面时，不会增加list胀肚
             Unit unit = unitList.get(i);
-//            System.out.println(unit + " 语句的类型是 " + unit.getClass().getSimpleName());
 
             //直接调用，返回值没有接收的变量，可能是returnVoid，也有可能return有值但是没有人接受
             if (unit instanceof JInvokeStmt) {
                 JInvokeStmt jInvokeStmt = (JInvokeStmt) unit; //纯invoke语句
                 InvokeExpr invokeExpr = jInvokeStmt.getInvokeExpr(); //invoke表达式 specialinvoke $r1.<jtg.Person: void <init>()>()
-//                Body invokedBody = invokeExpr.getMethod().retrieveActiveBody();
-                List<Unit> initAssigns = new ArrayList<>();
                 //被调用者的body
                 Body invokedBody = SootCFG.getMethodBody(invokeExpr.getMethod().getDeclaringClass().getName(), invokeExpr.getMethod().getSignature());
                 Value callerVal = getCaller(jInvokeStmt.getInvokeExprBox().getValue());//是哪个主体调用的这个，方便重命名
                 for (Local local : invokedBody.getLocals()) {
-                    local.setName(callerVal + "X" + local.getName());
+                    local.setName(callerVal + "X" + local.getName()); //区分变量名称
                 }
                 List<Value> args = invokeExpr.getArgs();/*调用的实参*/
                 for (int j = 0; j < args.size(); j++)
-                    initAssigns.add(new JAssignStmt(invokedBody.getParameterLocal(j), args.get(j)));//调用将实参赋值
+                    invokedBody.getParameterLocal(j).setName(args.get(j).toString()); //原本是添加Assignment语句，结果只用处理变量名即可
                 UnitPatchingChain invokedChain = invokedBody.getUnits(); //被调用函数的语句
-                //将赋值的操作加到被调用语句的前面
-                if (!initAssigns.isEmpty()) invokedChain.insertBefore(initAssigns, invokedChain.getFirst());
                 //处理返回调度
                 Iterator<Unit> invokedIt = invokedChain.snapshotIterator();
                 while (invokedIt.hasNext()) {
                     Unit invokedUnit = invokedIt.next();
+                    if (invokedUnit instanceof JIdentityStmt) {
+                        JIdentityStmt jIdentityStmt = (JIdentityStmt) invokedUnit;
+                        if (jIdentityStmt.toString().contains("@this")) {
+                            Value leftOp = jIdentityStmt.getLeftOp();
+                            Local left = (Local) leftOp;
+                            left.setName(callerVal.toString());
+                        }                    }
                     if (invokedUnit instanceof JReturnStmt || invokedUnit instanceof JReturnVoidStmt) {
                         //最关键，bug找了好久，要在函数调用最后加GOTO！！否则图是错的
                         JGotoStmt gotoStmt = new JGotoStmt(unitList.get(i + 1));
@@ -79,28 +81,35 @@ public class PathUtil {
 
             //最后的返回值要保存
             if (unit instanceof JAssignStmt && ((JAssignStmt) unit).containsInvokeExpr()) {
+                System.out.println("黑恶" + unit);
                 Value callerVal = getCaller(((JAssignStmt) unit).getInvokeExprBox().getValue());
                 InvokeExpr invokeExpr = ((JAssignStmt) unit).getInvokeExpr();  //r2.<cut.LogicStructure: int crazyFun(int,int)>(i9, i1)
-                Value caller = ((JAssignStmt) unit).getLeftOp(); //赋值语句的左侧，用于存储返回值
+                Value home = ((JAssignStmt) unit).getLeftOp(); //赋值语句的左侧，用于存储返回值
                 Body invokedBody = SootCFG.getMethodBody(invokeExpr.getMethod().getDeclaringClass().getName(), invokeExpr.getMethod().getSignature());
-                List<Unit> initAssigns = new ArrayList<>();
-                for (Local local : invokedBody.getLocals()) {
+                for (Local local : invokedBody.getLocals())
                     local.setName(callerVal + "X" + local.getName());
-                }
+
                 List<Value> args = invokeExpr.getArgs();
                 for (int j = 0; j < args.size(); j++)
-                    initAssigns.add(new JAssignStmt(args.get(j), invokedBody.getParameterLocal(j)));//调用将实参赋值
+                    invokedBody.getParameterLocal(j).setName(args.get(j).toString());
+                //调用将实参赋值
                 UnitPatchingChain invokedChain = invokedBody.getUnits(); //被调用函数的语句
-                //将赋值的操作加到被调用语句的前面
-                if (!initAssigns.isEmpty()) invokedChain.insertBefore(initAssigns, invokedChain.getFirst());
                 Iterator<Unit> invokedIt = invokedChain.snapshotIterator();
                 while (invokedIt.hasNext()) {
                     Unit invokedUnit = invokedIt.next();
+                    if (invokedUnit instanceof JIdentityStmt) {
+                        JIdentityStmt jIdentityStmt = (JIdentityStmt) invokedUnit;
+                        if (jIdentityStmt.toString().contains("@this")) {
+                            Value leftOp = jIdentityStmt.getLeftOp();
+                            Local left = (Local) leftOp;
+                            left.setName(callerVal.toString());
+                        }
+                    }
                     if (invokedUnit instanceof JReturnStmt) {
                         JReturnStmt retStmt = (JReturnStmt) invokedUnit;
                         Value retVal = retStmt.getOp();
                         //最后将返回值赋值给调用的地方
-                        invokedChain.insertBefore(new JAssignStmt(caller, retVal), retStmt);
+                        invokedChain.insertBefore(new JAssignStmt(home, retVal), retStmt);
                         JGotoStmt gotoStmt = new JGotoStmt(unitList.get(i + 1));
                         invokedChain.insertBefore(gotoStmt, retStmt);
                         invokedChain.remove(retStmt); //移除返回语句

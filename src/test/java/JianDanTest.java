@@ -1,4 +1,6 @@
+import jtg.generator.BranchCovGenerator;
 import jtg.generator.GeneralGenerator;
+import jtg.generator.PrimePathCovGenerator;
 import jtg.generator.StmtCovGenerator;
 import jtg.generator.path.DDLPrimePathCal;
 import org.junit.jupiter.api.Test;
@@ -12,21 +14,21 @@ import java.util.*;
 
 public class JianDanTest {
     //基路径生成算法
-    @Test
-    public void testPrimePath(){
-        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
-        String clsName = "cut.LogicStructure";
-        String methodName = "pat";
-        DDLPrimePathCal cal = new DDLPrimePathCal(clspath, clsName, methodName);
-        Set<List<Unit>> lists = cal.generatePrimePathUnit();
-        int i = 0;
-        for (List<Unit> list : lists) {
-            System.out.println("***************prime path " + i++ + "**************");
-            for (Unit unit : list) {
-                System.out.println(unit);
-            }
-        }
-    }
+//    @Test
+//    public void testPrimePath(){
+//        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
+//        String clsName = "cut.LogicStructure";
+//        String methodName = "pat";
+//        DDLPrimePathCal cal = new DDLPrimePathCal(clspath, clsName, methodName);
+//        Set<List<Unit>> lists = cal.generatePrimePathUnit();
+//        int i = 0;
+//        for (List<Unit> list : lists) {
+//            System.out.println("***************prime path " + i++ + "**************");
+//            for (Unit unit : list) {
+//                System.out.println(unit);
+//            }
+//        }
+//    }
 
     //扩展
     @Test
@@ -51,8 +53,26 @@ public class JianDanTest {
     public void testStmtCov(){
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
-        String methodName = "loopAll";
+        String methodName = "test004";
         StmtCovGenerator generator = new StmtCovGenerator(clspath, clsName, methodName);
+        generator.generate();
+    }
+
+    @Test
+    public void testPrimePathCov(){
+        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
+        String clsName = "cut.LogicStructure";
+        String methodName = "loopAll";
+        PrimePathCovGenerator generator = new PrimePathCovGenerator(clspath, clsName, methodName);
+        generator.generate();
+    }
+
+    @Test
+    public void testBranchCov(){
+        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
+        String clsName = "cut.LogicStructure";
+        String methodName = "loopAll";
+        BranchCovGenerator generator = new BranchCovGenerator(clspath, clsName, methodName);
         generator.generate();
     }
 }

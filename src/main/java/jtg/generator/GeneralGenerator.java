@@ -5,17 +5,13 @@ import jtg.generator.util.StaticsUtil;
 import jtg.graphics.SootCFG;
 import jtg.solver.Z3Solver;
 import jtg.visualizer.Visualizer;
-import soot.Body;
-import soot.Local;
-import soot.Unit;
-import soot.Value;
+import soot.*;
+import soot.jimple.StaticFieldRef;
 import soot.jimple.internal.*;
-import soot.toolkits.graph.BlockGraph;
-import soot.toolkits.graph.BriefBlockGraph;
 import soot.toolkits.graph.ClassicCompleteUnitGraph;
 import soot.toolkits.graph.UnitGraph;
 
-import java.io.File;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -35,6 +31,8 @@ public abstract class GeneralGenerator {
     protected String mtdName;
     protected UnitGraph ug;
     protected Body body;
+    protected List<Unit> heads;
+    protected List<Unit> tails;
     private List<Local> jimpleVars;
     private List<Local> paras;
     private List<Local> localVars;
@@ -76,14 +74,28 @@ public abstract class GeneralGenerator {
     Set<Object> solvableSet;
     Set<Object> unsolvableSet;
     Set<String> testData;
+    Map<String, Type> typeMap;
     public void generate() {
+        drawCFG(mtdName + "", false);
         PathUtil.extendCFG(body); //扩展调用的方法，成为完整的CFG
+        PathUtil.extendCFG(body);
         ug = new ClassicCompleteUnitGraph(body); //更新这个图
-//        for (Unit unit : body.getUnits()) {
-//            System.out.println(unit.getClass().getSimpleName() + "---->"+unit);
-//        }
-        drawCFG("test_insertAfter", false);
+        drawCFG(mtdName + "_extend", false);
         init();
+        heads = ug.getHeads();
+        tails = ug.getTails();
+        typeMap = new HashMap<>();
+        for (Unit unit : body.getUnits()) {
+            if (unit instanceof JIdentityStmt) { //只要开头的Identity，记录下类型
+                JIdentityStmt jIdentityStmt = (JIdentityStmt) unit;
+                String leftOpStr = jIdentityStmt.getLeftOp().toString();
+                Type type = jIdentityStmt.getRightOp().getType();
+                System.out.println(leftOpStr + "  " +type);
+                typeMap.put(leftOpStr, type);
+            }else {
+                break;
+            }
+        }
         for (Object o : initSet) {
             if (solvableSet.contains(o)) continue; //如果这项前面已经覆盖了，就直接跳过不算了
             Set<List<Unit>> allFullPath = calAllFullCandidate(o);
@@ -92,21 +104,30 @@ public abstract class GeneralGenerator {
             for (List<Unit> units : allFullPath) {
                 try {
                     String constraint = calPathConstraint(units);
+//                    if (typeMap.c)
+                    System.out.println("约束："+constraint);
+                    String solve = solve(constraint);
+                    if (solve.contains("error")) { //无解
+                        System.out.println("无解：" + units);
+                        continue;
+                    }
                     successFullPath = units;
-                    System.out.println("success " + successFullPath );
+                    System.out.println("success ");
+                    for (Unit unit : successFullPath) {
+                        System.out.println(unit);
+                    }
                     solvable = true;
-                    System.out.println("约束是" + constraint);
-                    testData.add(solve(constraint));
+                    System.out.println("解是 " + solve);
+                    testData.add(solve);
                     break; //找到解，后面的备选路径就不用看了
                 } catch (Exception e) {
+                    System.out.println("异常 ");
+                    e.printStackTrace();
                     continue; //这一条路径约束无解
                 }
             }
             if (solvable) {
-                solvableSet.add(o);
-                checkOtherIfCov(successFullPath);
-            }else {
-                unsolvableSet.add(o);
+                checkCov(successFullPath);
             }
         }
         double covRate = solvableSet.size() / (double)initSet.size();
@@ -127,10 +148,10 @@ public abstract class GeneralGenerator {
     abstract Set<List<Unit>> calAllFullCandidate(Object o);
 
     /**
-     * 在计算出一条完整路径有解的时候，检测这个路径是否包含了其他的要求覆盖的集合
+     * 在计算出一条完整路径有解的时候，检测这个路径包含了哪些要求覆盖的集合
      * @param fullPath
      */
-    abstract void checkOtherIfCov(List<Unit> fullPath);
+    abstract void checkCov(List<Unit> fullPath);
 
     /******************************路径约束求解***********************************/
     HashMap<String, String> assignList = new HashMap<>(); //用于变量替换，在路径遍历途中，变量的具体值在不断变化
@@ -144,12 +165,10 @@ public abstract class GeneralGenerator {
                 JAssignStmt assignStmt = (JAssignStmt) stmt;
                 Value leftOp = assignStmt.getLeftOp();
                 Value rightOp = assignStmt.getRightOp();
-                String leftOpStr = leftOp.toString();
-                String rightOpStr = rightOp.toString();
                 //先预处理右边的符号，lengthof、new、数组引用
-                rightOpStr = preHandleRightVal(leftOp, rightOp);
+                String rightOpStr = preHandleRightVal(leftOp, rightOp);
                 //再预处理左侧表达式
-                leftOpStr = preHandleLeftVal(leftOp);
+                String leftOpStr = preHandleLeftVal(leftOp);
 //                System.out.println(leftOpStr + "  <-->  " + rightOpStr);
                 assignList.put(leftOpStr, rightOpStr);
             }
@@ -216,6 +235,7 @@ public abstract class GeneralGenerator {
         } else if (rightOp instanceof JArrayRef) { //数组引用
             JArrayRef jArrayRef = (JArrayRef) rightOp;
             String arrExpr = handleArrInd(jArrayRef);
+            System.out.println(arrExpr);
             return Optional.ofNullable(assignList.get(arrExpr)).orElse(arrExpr);
         } else if (rightOp instanceof JNewArrayExpr) {
             JNewArrayExpr jNewArrayExpr = (JNewArrayExpr) rightOp;
@@ -236,17 +256,34 @@ public abstract class GeneralGenerator {
         }else if(rightOp instanceof AbstractJimpleFloatBinopExpr){
             //最后正式在处理变量的具体表示，如：r0 = r1 + r2
             StringBuilder detailRightOp = new StringBuilder();
-            for (String s : rightOp.toString().split("\\s+")) {
-                if (assignList.containsKey(s)) {
-                    s = " ( " + assignList.get(s) + " ) "; //每次put加括号也可能有问题，比如对象.属性，这个就变成了(对象).属性
-                }
+            String[] split = rightOp.toString().split("\\s+");
+            split[0] = " ( " +  Optional.ofNullable(assignList.get(split[0])).orElse(split[0]) + " ) ";
+            split[2] = " ( " +  Optional.ofNullable(assignList.get(split[2])).orElse(split[2]) + " ) ";
+            for (String s : split) {
+//                if (assignList.containsKey(s)) {
+//                    s = " ( " + assignList.get(s) + " ) "; //每次put加括号也可能有问题，比如对象.属性，这个就变成了(对象).属性
+//                }
                 detailRightOp.append(s); //将右侧的语句化简成最简单
             }
             return detailRightOp.toString();
         }else if(rightOp instanceof JimpleLocal){
             String rightOpStr = extendFullObjName(rightOp);
             return Optional.ofNullable(assignList.get(rightOpStr)).orElse(rightOpStr);
-        }else {
+        } else if (rightOp instanceof JNegExpr) {
+            JNegExpr jNegExpr = (JNegExpr) rightOp;
+            return " ( 0 - " + jNegExpr.getOp() + " ) ";
+        } else if (rightOp instanceof StaticFieldRef) {
+            StaticFieldRef staticFieldRef = (StaticFieldRef) rightOp;
+            String rightOpStr = rightOp.toString();
+            Class<?> cls = Class.forName(staticFieldRef.getType().toString());
+            if(cls.isEnum()){
+                Field field = cls.getDeclaredField(staticFieldRef.getField().getName());
+                Enum anEnum = (Enum)field.get(null);
+                int ordinal = anEnum.ordinal();
+                rightOpStr = String.valueOf(ordinal);
+            }
+            return rightOpStr;
+        } else {
             return rightOp.toString();
         }
     }
@@ -256,12 +293,14 @@ public abstract class GeneralGenerator {
      * @return
      */
     private String extendFullObjName(Value value){
-        if (value.toString().contains("X")) {
-            String[] cutBaseStr = value.toString().split("X");
-            cutBaseStr[0] = Optional.ofNullable(assignList.get(cutBaseStr[0])).orElse(cutBaseStr[0]) + "_";
-            return cutBaseStr[0] + cutBaseStr[1];
-        }
-        return value.toString();
+        String valStr = value.toString();
+        valStr = Optional.ofNullable(assignList.get(valStr)).orElse(valStr);
+//        if (valStr.contains("X")) {
+//            String[] cutBaseStr = value.toString().split("X");
+//            cutBaseStr[0] = Optional.ofNullable(assignList.get(cutBaseStr[0])).orElse(cutBaseStr[0]) + "_";
+//            return cutBaseStr[0] + cutBaseStr[1];
+//        }
+        return valStr;
     }
     /**
      * 处理数组变量的符号
@@ -289,5 +328,30 @@ public abstract class GeneralGenerator {
 
     public String solve(String pathConstraint) throws Exception {
         return Z3Solver.solve(pathConstraint);
+    }
+
+    private String addTypeConstraint(String s) throws ClassNotFoundException {
+        String constraint = new String(s);
+        if (s.equals("")) s = "1 == 1";
+        for (Map.Entry<String, Type> stringTypeEntry : typeMap.entrySet()) {
+            String val = stringTypeEntry.getKey();
+            Type type = stringTypeEntry.getValue();
+            if (constraint.contains(val)) {
+                if (type.toString().equals("int")) {
+                    s = s + " && ( " + val + " % 1 = 0 )";
+                } else if (type.toString().equals("char")) {
+                    s = s + " && ( " + val + " % 1 = 0 ) && (" + val + " >= 0 ) && ( " + val + " <= 65535 )";
+                } else if (type.toString().equals("boolean")) {
+                    s = s + " && ( " + val + " = 0 || " + val + " = 1 )"; //0 true
+                }
+            }
+            Class<?> clz = Class.forName(type.toString());
+            if (clz.isEnum()) {
+                Class<Enum> clazz = (Class<Enum>)clz;
+                int ordNum = clazz.getEnumConstants().length;
+                s = s + " && ( " + val + " % 1 = 0 ) && ( " + val + " > 0 ) && ( " + val + " < " + ordNum + " )";
+            }
+        }
+        return s;
     }
 }

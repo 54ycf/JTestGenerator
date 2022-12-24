@@ -37,7 +37,7 @@ public class Z3Solver {
                     res.append(var + "=" + s.getModel().eval(var, false) + " ");
                 }
             } else {
-                res.append("");//无解
+                res.append("error");//无解
             }
 
         }catch (Exception e){
