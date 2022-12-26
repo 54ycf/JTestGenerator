@@ -60,7 +60,7 @@ public class JianDanTest {
     public void testStmtCov(){
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
-        String methodName = "test005";
+        String methodName = "test008";
         StmtCovGenerator generator = new StmtCovGenerator(clspath, clsName, methodName);
         generator.generate();
     }
@@ -69,7 +69,7 @@ public class JianDanTest {
     public void testPrimePathCov(){
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
-        String methodName = "loopAll";
+        String methodName = "pat";
         PrimePathCovGenerator generator = new PrimePathCovGenerator(clspath, clsName, methodName);
         generator.generate();
     }

@@ -17,9 +17,9 @@ class Z3SolverTest {
 //        System.out.println(result);
 //        assertThat(result,containsString("a="));
 //        assertThat(result,containsString("b="));
-        Random random = new Random();
-        for (int i = 0; i < 100; i++) {
-            System.out.println(random.nextInt(2));
+        String s = "r0_ind3_age=1";
+        for (String s1 : s.split("_")) {
+            System.out.println(s1);
         }
     }
 }

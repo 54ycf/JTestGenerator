@@ -59,8 +59,10 @@ public class LogicStructure {
         for (int i = 0; i < arr.length; i++) {
             if (arr[i] > 0) {
                 sum += arr[i];
-            }else {
+            }else if (arr[i] == 0){
                 sum -= arr[i];
+            }else{
+                sum ++;
             }
         }
         return sum;
@@ -90,10 +92,8 @@ public class LogicStructure {
     //测试函数调用
     public int test006(boolean op) {
         if (op ) {
-            op = false;
             return test001(1);
         }else {
-            op = true;
             return test001(2);
         }
     }
@@ -102,9 +102,33 @@ public class LogicStructure {
     public int test007(Person[] people) {
         int sum = 0;
         for (int i = 0; i < people.length; i++) {
-            sum += people[i].getAge();
+            Person person = people[i];
+            if (person.getAge() > 0) {
+                sum++;
+            }else{
+                sum--;
+            }
         }
         return sum;
+    }
+
+    //复杂组合
+    public int test008(int op, boolean flag, char[] chars, Person person) {
+        if (flag) {
+            int temp = person.getAge();
+            if (temp > 10 && op > temp) {
+                return test001(op);
+            }
+            return 1;
+        }else{
+            int t = 4;
+            int result = 0;
+            while (t > 0) {
+                t--;
+                result += person.getAge();
+            }
+            return result;
+        }
     }
 
     public int pat(char[] subject, char[] pattern) {
@@ -114,8 +138,6 @@ public class LogicStructure {
         boolean isPat = false;
         int subjectLen = subject.length;
         int patternLen = pattern.length;
-        subjectLen = crazyFun(subjectLen,patternLen);
-//        subjectLen = new Integer(patternLen);
         while (isPat == false  && iSub+patternLen-1<subjectLen) {
             if (subject[iSub] == pattern[0]) {
                 rtnIndex = iSub;
@@ -133,32 +155,5 @@ public class LogicStructure {
         return rtnIndex;
     }
 
-    public int crazyFun(int op, int oop) {
-        System.out.println(oop);
-//        crazyFunFun(op, oop);
-        if (op > 0) {
-            return op+9999;
-        }else {
-            return op-9999;
-        }
-    }
-
-    public void crazyFunFun(int op, int oop) {
-        System.out.println(oop);
-        if (op > 0) {
-            ++op;
-            return;
-        }else {
-            --op;
-            return;
-        }
-    }
-
-    public int charTest(String str) {
-        if (str.equals("abc")) {
-            return 1;
-        }
-        return 2;
-    }
 }
 

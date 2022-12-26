@@ -1,5 +1,7 @@
 package jtg.generator.util;
 
+import org.apache.commons.lang3.RandomStringUtils;
+
 import java.util.Random;
 import java.util.UUID;
 
@@ -26,8 +28,11 @@ public class RandomUtil {
     }
 
     public static String randStr(){
-        String s = UUID.randomUUID().toString();
-        return s.substring(0,randInt(s.length()));
+        return RandomStringUtils.randomAlphanumeric(randInt(30));
+    }
+
+    public static String randStr(int len){
+        return RandomStringUtils.randomAlphanumeric(len);
     }
 
 

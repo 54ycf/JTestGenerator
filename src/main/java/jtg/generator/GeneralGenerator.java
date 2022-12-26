@@ -1,6 +1,8 @@
 package jtg.generator;
 
+import com.alibaba.fastjson.JSONObject;
 import jtg.generator.util.PathUtil;
+import jtg.generator.util.RandomUtil;
 import jtg.generator.util.StaticsUtil;
 import jtg.graphics.SootCFG;
 import jtg.solver.Z3Solver;
@@ -78,10 +80,13 @@ public abstract class GeneralGenerator {
     Map<String, Type> typeMap;
     Set<Unit> caller = new HashSet<>();
 
+    List<Local> parameterLocals;
+
     public void generate() {
         drawCFG(mtdName + "", false);
+        parameterLocals = body.getParameterLocals();
         PathUtil.extendCFG(body, caller); //扩展调用的方法，成为完整的CFG
-        PathUtil.extendCFG(body, caller);
+//        PathUtil.extendCFG(body, caller);
         ug = new ClassicCompleteUnitGraph(body); //更新这个图
         drawCFG(mtdName + "_extend", false);
         init();
@@ -89,11 +94,10 @@ public abstract class GeneralGenerator {
         tails = ug.getTails();
         typeMap = new HashMap<>();
         for (Unit unit : body.getUnits()) {
-            if (unit instanceof JIdentityStmt) { //只要开头的Identity，记录下类型
+            if (unit instanceof JIdentityStmt) { //暂时只要开头的Identity，记录下类型
                 JIdentityStmt jIdentityStmt = (JIdentityStmt) unit;
                 String leftOpStr = jIdentityStmt.getLeftOp().toString();
                 Type type = jIdentityStmt.getRightOp().getType();
-                System.out.println(leftOpStr + "  " + type);
                 typeMap.put(leftOpStr, type);
             } else {
                 break;
@@ -107,9 +111,9 @@ public abstract class GeneralGenerator {
             for (List<Unit> units : allFullPath) {
                 try {
                     String constraint = calPathConstraint(units);
-                    System.out.println("约束：" + constraint);
+//                    System.out.println("约束：" + constraint);
                     constraint = addTypeConstraint(constraint); //根据类型加入新约束
-                    System.out.println("新约束：" + constraint);
+//                    System.out.println("新约束：" + constraint);
                     String solve = solve(constraint);
                     if (solve.contains("error")) { //无解
                         System.out.println("无解：" + units);
@@ -117,10 +121,10 @@ public abstract class GeneralGenerator {
                         continue;
                     }
                     successFullPath = units;
-                    System.out.println("success ");
-                    for (Unit unit : successFullPath) {
-                        System.out.println(unit);
-                    }
+//                    System.out.println("success ");
+//                    for (Unit unit : successFullPath) {
+//                        System.out.println(unit);
+//                    }
                     solvable = true;
                     System.out.println("解是 " + solve);
                     System.out.println();
@@ -139,6 +143,84 @@ public abstract class GeneralGenerator {
         double covRate = solvableSet.size() / (double) initSet.size();
         System.out.println("覆盖率是 " + covRate);
         System.out.println(testData);
+
+        try {
+            genData();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void genData() throws Exception {
+        for (Local parameterLocal : parameterLocals) {
+            System.out.println(parameterLocal.getType());
+        }
+        List<Object[]> tc = new ArrayList<>();
+        for (String testDatum : testData) {
+            Object[] arguments = new Object[parameterLocals.size()];
+            String[] items = testDatum.split("\\s+"); //一行数据
+            Map<String, String> valueMap = new HashMap<>();
+            for (String item : items) {
+                String[] split = item.split("=");
+                String compVar = split[0]; //r0_ind3_age=1
+                String val = split[1];
+                valueMap.put(compVar, val);
+            }
+            for (int i = 0; i < parameterLocals.size(); i++) {
+                Local param = parameterLocals.get(i);
+                if (param.getType() instanceof ArrayType) {
+                    ArrayType arrayType = (ArrayType) param.getType();
+                    int len = Integer.parseInt(valueMap.get(param + "_len")); //其实嘛也不是一定存在len
+                    Object[] arr = new Object[len];
+                    Type arrayElementType = arrayType.getArrayElementType();
+                    for (int j = 0; j < arr.length; j++) {
+                        String val = param + "_ind" + j;
+                        arr[j] = handleSimpleType(arrayElementType, val, valueMap);
+                    }
+                    arguments[i] = arr;
+                }else{
+                    arguments[i] = handleSimpleType(param.getType(), param.toString(), valueMap);
+                }
+            }
+            tc.add(arguments);
+        }
+        System.out.println(JSONObject.toJSONString(tc));
+    }
+
+    private Object handleSimpleType(Type type, String val, Map<String, String> valueMap) throws Exception {
+        if (type instanceof IntType) {
+            return Integer.parseInt(valueMap.get(val));
+        } else if (type instanceof CharType) {
+            return (char) Integer.parseInt(valueMap.get(val));
+        } else if (type instanceof BooleanType) {
+            return valueMap.get(val).equals("0"); //0t 1f
+        } else if (type.toString().equals("java.lang.String")) {
+            int len = Integer.parseInt(valueMap.get(val + "_value_len"));
+            return RandomUtil.randStr(len);
+        } else if (type instanceof RefType) {
+            Class<?> clz = Class.forName(type.toString());
+            if (clz.isEnum()) {
+                Class<Enum> clazz = (Class<Enum>) clz;
+                Enum[] enumConstants = clazz.getEnumConstants();
+                return enumConstants[Integer.parseInt(valueMap.get(val))];
+            } else {
+                Field[] fields = clz.getFields();
+                Object obj = clz.newInstance();
+                for (Field field : fields) {
+                    Class<?> fieldType = field.getType();
+                    if (fieldType == Integer.class || fieldType == int.class) {
+                        field.setInt(obj, OptionalInt.of(Integer.parseInt(valueMap.get(val + "_" + field.getName()))).orElse(0));
+                    } else if (fieldType == String.class) {
+                        field.set(obj, Optional.ofNullable(valueMap.get(val + "_" + field.getName())).orElse(""));
+                    } else {
+                        field.set(obj, null);
+                    }
+                }
+                return obj;
+            }
+        }else{
+            return null;
+        }
     }
 
     /**
@@ -169,7 +251,7 @@ public abstract class GeneralGenerator {
         String pathConstraint = "";
         String expectedResult = "";
         ArrayList<String> stepConditions = new ArrayList<>(); //Jimple变量是字节码中为三地址表示增添的变量，去掉它
-        for (int i=0; i<path.size(); ++i) {
+        for (int i = 0; i < path.size(); ++i) {
             Unit stmt = path.get(i);
             if (caller.contains(stmt)) continue; //调用语句不处理
             //赋值语句
@@ -333,6 +415,7 @@ public abstract class GeneralGenerator {
 
     /**
      * 处理数组变量的符号
+     *
      * @param jArrayRef
      * @return
      * @throws Exception
@@ -348,7 +431,7 @@ public abstract class GeneralGenerator {
                 throw new Exception("抱歉，暂不支持未确定索引的数组处理");
             }
             String solveRes = solve(indExp + " - a == 0"); //最后会得到a=?这样的字符串表达式，问号就是索引值
-            rightOpStr = baseStr + "_ind" + solveRes.substring(2);
+            rightOpStr = baseStr + "_ind" + solveRes.substring(2).trim();
         } else { //r0[3]这样的常量
             rightOpStr = baseStr + "_ind" + indStr;
         }
