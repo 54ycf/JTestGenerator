@@ -74,7 +74,7 @@ public class SimpleGenerator {
         System.out.println("Generating test case inputs for method: " + clsName + "." + mtdName + "()");
         System.out.println("============================================================================");
 //        System.out.println("老body\n" + body);
-        PathUtil.extendCFG(body);
+//        PathUtil.extendCFG(body);
 //        System.out.println("新body\n" + body);
         ug = new ClassicCompleteUnitGraph(body); //扩展后的图
         Visualizer.printCFGDot("test_new_invoke", ug, false);

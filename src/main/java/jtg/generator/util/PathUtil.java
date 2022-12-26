@@ -35,7 +35,7 @@ public class PathUtil {
     //处理调用方法，让他成为更大的cfg
     //JInvokeStmt如果是纯调用，最后就不处理返回值
     //JAssignStmt如果调用有返回值，要将返回值赋值给发起调用的位置
-    public static void extendCFG(Body originBody) { //TODO 目前是只调用了一次
+    public static void extendCFG(Body originBody, Set<Unit> caller) { //TODO 目前是只调用了一次
         //TODO 变量名重复的问题未解决
         UnitPatchingChain units = originBody.getUnits();
         List<Unit> unitList = new ArrayList<>(units);//循环要更改列表，不能用foreach
@@ -44,6 +44,7 @@ public class PathUtil {
 
             //直接调用，返回值没有接收的变量，可能是returnVoid，也有可能return有值但是没有人接受
             if (unit instanceof JInvokeStmt) {
+                caller.add(unit);
                 JInvokeStmt jInvokeStmt = (JInvokeStmt) unit; //纯invoke语句
                 InvokeExpr invokeExpr = jInvokeStmt.getInvokeExpr(); //invoke表达式 specialinvoke $r1.<jtg.Person: void <init>()>()
                 //被调用者的body
@@ -66,7 +67,8 @@ public class PathUtil {
                             Value leftOp = jIdentityStmt.getLeftOp();
                             Local left = (Local) leftOp;
                             left.setName(callerVal.toString());
-                        }                    }
+                        }
+                    }
                     if (invokedUnit instanceof JReturnStmt || invokedUnit instanceof JReturnVoidStmt) {
                         //最关键，bug找了好久，要在函数调用最后加GOTO！！否则图是错的
                         JGotoStmt gotoStmt = new JGotoStmt(unitList.get(i + 1));
@@ -75,13 +77,13 @@ public class PathUtil {
                     }
                 }
                 units.insertOnEdge(invokedChain, unit, null); //将被调用的语句拼接到大图中
-                units.remove(unit);//移除调用语句
+//                units.remove(unit);//移除调用语句
             }
 
 
             //最后的返回值要保存
             if (unit instanceof JAssignStmt && ((JAssignStmt) unit).containsInvokeExpr()) {
-                System.out.println("黑恶" + unit);
+                caller.add(unit);
                 Value callerVal = getCaller(((JAssignStmt) unit).getInvokeExprBox().getValue());
                 InvokeExpr invokeExpr = ((JAssignStmt) unit).getInvokeExpr();  //r2.<cut.LogicStructure: int crazyFun(int,int)>(i9, i1)
                 Value home = ((JAssignStmt) unit).getLeftOp(); //赋值语句的左侧，用于存储返回值
@@ -116,7 +118,7 @@ public class PathUtil {
                     }
                 }
                 units.insertOnEdge(invokedChain, unit, null);
-                units.remove(unit);//移除调用语句
+//                units.remove(unit);//移除调用语句
             }
         }
     }

@@ -2,6 +2,7 @@ package jtg.generator.util;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class CommonUtil {
     public static boolean leftIsSubList(List left, List right) {

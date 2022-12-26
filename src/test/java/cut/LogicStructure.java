@@ -33,7 +33,7 @@ public class LogicStructure {
             return /*Integer.toString(op)*/"";
     }
 
-    //测试循环
+    //测试循环，基本类型
     public int test001(int op) {
         int sum = 0;
         for (int i = 0; i < op; i++) {
@@ -42,8 +42,19 @@ public class LogicStructure {
         return sum;
     }
 
+    //测试string
+    public int test002(String str) {
+        if (str.length() < 10) {
+            return 1;
+        }else if (str.length() < 20){
+            return 0;
+        }else {
+            return -1;
+        }
+    }
+
     //测试数组
-    public int test002(int[] arr) {
+    public int test003(int[] arr) {
         int sum = 0;
         for (int i = 0; i < arr.length; i++) {
             if (arr[i] > 0) {
@@ -55,32 +66,45 @@ public class LogicStructure {
         return sum;
     }
 
-    //复杂类型的数组
-    public int test003(Person[] people) {
-        if (people[0].getAge() > 0) {
-            return people[0].getAge();
-        }else{
-            return people[1].getAge();
-        }
-    }
-
-    //测试函数调用
-    public int test004(boolean op) {
-        if (op ) {
-            return test001(1);
-        }else {
-            return test001(2);
-        }
-    }
-
-    public int test005(MyEnum myEnum) {
-        if (myEnum.equals(MyEnum.a)) {
+    //测试枚举类
+    public int test004(MyEnum myEnum) {
+        if (myEnum== MyEnum.a) {
             return -1;
-        } else if (myEnum.equals(MyEnum.b)) {
+        } else if (myEnum== MyEnum.b) {
             return 1;
         } else {
             return 0;
         }
+    }
+
+    //测试普通类
+    public int test005(Person person) {
+        int temp = person.getAge();
+        if (person.getAge() > 0) {
+            return test001(temp);
+        }else {
+            return test001(-temp);
+        }
+    }
+
+    //测试函数调用
+    public int test006(boolean op) {
+        if (op ) {
+            op = false;
+            return test001(1);
+        }else {
+            op = true;
+            return test001(2);
+        }
+    }
+
+    //复杂类型的数组
+    public int test007(Person[] people) {
+        int sum = 0;
+        for (int i = 0; i < people.length; i++) {
+            sum += people[i].getAge();
+        }
+        return sum;
     }
 
     public int pat(char[] subject, char[] pattern) {

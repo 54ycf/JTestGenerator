@@ -1,7 +1,4 @@
-import jtg.generator.BranchCovGenerator;
-import jtg.generator.GeneralGenerator;
-import jtg.generator.PrimePathCovGenerator;
-import jtg.generator.StmtCovGenerator;
+import jtg.generator.*;
 import jtg.generator.path.DDLPrimePathCal;
 import org.junit.jupiter.api.Test;
 import soot.Unit;
@@ -49,11 +46,21 @@ public class JianDanTest {
 //        GeneralGenerator gg = new GeneralGenerator(clspath, clsName, methodName);
 //        gg.generate();
     }
+
+    @Test
+    public void testRandomGen() throws Exception {
+        String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
+        String clsName = "cut.LogicStructure";
+        String methodName = "test007";
+        RandomGenerator generator = new RandomGenerator(clspath, clsName, methodName);
+        generator.generate();
+    }
+
     @Test
     public void testStmtCov(){
         String clspath = System.getProperty("user.dir") + File.separator + "target" + File.separator + "test-classes";
         String clsName = "cut.LogicStructure";
-        String methodName = "test004";
+        String methodName = "test005";
         StmtCovGenerator generator = new StmtCovGenerator(clspath, clsName, methodName);
         generator.generate();
     }
