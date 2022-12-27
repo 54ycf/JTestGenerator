@@ -52,7 +52,7 @@ public class Visualizer {
     private static String getLabelFromUnit(Unit unit) {
         StringBuilder label;
         label = new StringBuilder(unit.toString());
-        System.out.println("The original label: " + label.toString());
+//        System.out.println("The original label: " + label.toString());
         if (unit instanceof JAssignStmt) {
             JAssignStmt jAssignStmt = (JAssignStmt) unit;
             if (jAssignStmt.containsInvokeExpr() && jAssignStmt.getInvokeExpr() instanceof JVirtualInvokeExpr) {
@@ -88,7 +88,7 @@ public class Visualizer {
                 .replace("java.lang.", "")
                 .replace("java.io.", "")
                 .replace("\"", ""));//bug:如果sootcode中包含""，dot生成图像出错
-        System.out.println("The filtered label: " + label.toString());
+//        System.out.println("The filtered label: " + label.toString());
         return label.toString();
     }
 

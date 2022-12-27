@@ -35,9 +35,6 @@ public abstract class GeneralGenerator {
     protected Body body;
     protected List<Unit> heads;
     protected List<Unit> tails;
-    private List<Local> jimpleVars;
-    private List<Local> paras;
-    private List<Local> localVars;
 
     public GeneralGenerator(String classPath, String className, String methodName) {
         clsPath = classPath;
@@ -45,33 +42,13 @@ public abstract class GeneralGenerator {
         mtdName = methodName;
         ug = SootCFG.getMethodCFG(clsPath, clsName, mtdName);
         body = SootCFG.getMethodBody(clsPath, clsName, mtdName);
-        getVars();
     }
 
     public void drawCFG(String graphName, boolean indexLabel) {
-        System.out.println("=======================start To draw======================");
+//        System.out.println("=======================start To draw======================");
         Visualizer.printCFGDot(graphName, ug, indexLabel);
     }
 
-    private void getVars() {
-        jimpleVars = new ArrayList<>();
-        paras = new ArrayList<>();
-        localVars = new ArrayList<>();
-        //Jimple自身增加的Locals，不是被测代码真正的变量
-        for (Local l : body.getLocals()) {
-            if (l.toString().startsWith("$")) jimpleVars.add(l);
-        }
-        //参数
-        for (Local para : body.getParameterLocals()) {
-            paras.add(para);
-        }
-        //剩下的就是局部变量
-        for (Local l : body.getLocals()) {
-            if (!paras.contains(l) && !jimpleVars.contains(l)) {
-                localVars.add(l);
-            }
-        }
-    }
 
     Set<Object> initSet;
     Set<Object> solvableSet;
@@ -111,6 +88,7 @@ public abstract class GeneralGenerator {
             for (List<Unit> units : allFullPath) {
                 try {
                     String constraint = calPathConstraint(units);
+                    System.out.println(typeMap.size());
 //                    System.out.println("约束：" + constraint);
                     constraint = addTypeConstraint(constraint); //根据类型加入新约束
 //                    System.out.println("新约束：" + constraint);
@@ -141,21 +119,23 @@ public abstract class GeneralGenerator {
             }
         }
         double covRate = solvableSet.size() / (double) initSet.size();
-        System.out.println("覆盖率是 " + covRate);
-        System.out.println(testData);
+        System.out.println("覆盖率是: " + covRate);
+        System.out.println("约束求解集合: " + testData);
 
         try {
-            genData();
+            Object o = genData();
+            System.out.println("生成结果集合: " + JSONObject.toJSONString(o));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void genData() throws Exception {
-        for (Local parameterLocal : parameterLocals) {
-            System.out.println(parameterLocal.getType());
-        }
+    private Object genData() throws Exception {
+//        for (Local parameterLocal : parameterLocals) {
+//            System.out.println(parameterLocal.getType());
+//        }
         List<Object[]> tc = new ArrayList<>();
+        int I = 1;
         for (String testDatum : testData) {
             Object[] arguments = new Object[parameterLocals.size()];
             String[] items = testDatum.split("\\s+"); //一行数据
@@ -170,7 +150,7 @@ public abstract class GeneralGenerator {
                 Local param = parameterLocals.get(i);
                 if (param.getType() instanceof ArrayType) {
                     ArrayType arrayType = (ArrayType) param.getType();
-                    int len = Integer.parseInt(valueMap.get(param + "_len")); //其实嘛也不是一定存在len
+                    int len = Integer.parseInt(Optional.ofNullable(valueMap.get(param + "_len")).orElse("1")); //其实嘛也不是一定存在len
                     Object[] arr = new Object[len];
                     Type arrayElementType = arrayType.getArrayElementType();
                     for (int j = 0; j < arr.length; j++) {
@@ -183,33 +163,35 @@ public abstract class GeneralGenerator {
                 }
             }
             tc.add(arguments);
+            System.out.println("测试数据"+I+": " + JSONObject.toJSONString(arguments));
+            ++I;
         }
-        System.out.println(JSONObject.toJSONString(tc));
+        return tc;
     }
 
     private Object handleSimpleType(Type type, String val, Map<String, String> valueMap) throws Exception {
         if (type instanceof IntType) {
-            return Integer.parseInt(valueMap.get(val));
+            return Integer.parseInt(Optional.ofNullable(valueMap.get(val)).orElse("0"));
         } else if (type instanceof CharType) {
-            return (char) Integer.parseInt(valueMap.get(val));
+            return (char) Integer.parseInt(Optional.ofNullable(valueMap.get(val)).orElse("0"));
         } else if (type instanceof BooleanType) {
-            return valueMap.get(val).equals("0"); //0t 1f
+            return Optional.ofNullable(valueMap.get(val)).orElse("0").equals("0"); //0t 1f
         } else if (type.toString().equals("java.lang.String")) {
-            int len = Integer.parseInt(valueMap.get(val + "_value_len"));
+            int len = Integer.parseInt(Optional.ofNullable(valueMap.get(val + "_value_len")).orElse("1"));
             return RandomUtil.randStr(len);
         } else if (type instanceof RefType) {
             Class<?> clz = Class.forName(type.toString());
             if (clz.isEnum()) {
                 Class<Enum> clazz = (Class<Enum>) clz;
                 Enum[] enumConstants = clazz.getEnumConstants();
-                return enumConstants[Integer.parseInt(valueMap.get(val))];
+                return enumConstants[Integer.parseInt(Optional.ofNullable(valueMap.get(val)).orElse("0"))];
             } else {
                 Field[] fields = clz.getFields();
                 Object obj = clz.newInstance();
                 for (Field field : fields) {
                     Class<?> fieldType = field.getType();
                     if (fieldType == Integer.class || fieldType == int.class) {
-                        field.setInt(obj, OptionalInt.of(Integer.parseInt(valueMap.get(val + "_" + field.getName()))).orElse(0));
+                        field.setInt(obj,Integer.parseInt(Optional.ofNullable(valueMap.get(val + "_" + field.getName())).orElse("0")));
                     } else if (fieldType == String.class) {
                         field.set(obj, Optional.ofNullable(valueMap.get(val + "_" + field.getName())).orElse(""));
                     } else {
@@ -248,7 +230,7 @@ public abstract class GeneralGenerator {
 
     public String calPathConstraint(List<Unit> path) throws Exception {
         assignList = new HashMap<>();
-        String pathConstraint = "";
+        StringBuilder pathConstraint = new StringBuilder();
         String expectedResult = "";
         ArrayList<String> stepConditions = new ArrayList<>(); //Jimple变量是字节码中为三地址表示增添的变量，去掉它
         for (int i = 0; i < path.size(); ++i) {
@@ -291,13 +273,13 @@ public abstract class GeneralGenerator {
         //尾部
         if (stepConditions.isEmpty())
             return "";  //没有约束条件
-        pathConstraint = stepConditions.get(0);
+        pathConstraint = new StringBuilder(stepConditions.get(0));
         int i = 1;
         while (i < stepConditions.size()) {
-            pathConstraint = pathConstraint + " && " + stepConditions.get(i);
+            pathConstraint.append(" && ").append(stepConditions.get(i));
             i++;
         }
-        return pathConstraint;
+        return pathConstraint.toString();
     }
 
     /**
@@ -360,6 +342,8 @@ public abstract class GeneralGenerator {
             String[] split = rightOp.toString().split("\\s+");
             split[0] = " ( " + Optional.ofNullable(assignList.get(split[0])).orElse(split[0]) + " ) ";
             split[2] = " ( " + Optional.ofNullable(assignList.get(split[2])).orElse(split[2]) + " ) ";
+            if (split[0].startsWith(" ( -")) split[0] = split[0].replace(" ( -", " ( 0 -");
+            if (split[2].startsWith(" ( -")) split[2] = split[2].replace(" ( -", " ( 0 -");
             for (String s : split) {
 //                if (assignList.containsKey(s)) {
 //                    s = " ( " + assignList.get(s) + " ) "; //每次put加括号也可能有问题，比如对象.属性，这个就变成了(对象).属性

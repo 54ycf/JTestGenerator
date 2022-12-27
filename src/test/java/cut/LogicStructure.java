@@ -117,7 +117,9 @@ public class LogicStructure {
         if (flag) {
             int temp = person.getAge();
             if (temp > 10 && op > temp) {
-                return test001(op);
+                for (int i = 0; i < chars.length; i++) {
+                    if (chars[i] > 'a') return test001(op);
+                }
             }
             return 1;
         }else{

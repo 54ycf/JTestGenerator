@@ -349,7 +349,7 @@ public class SimpleGenerator {
     }
 
     public String solve(String pathConstraint) throws Exception {
-        return Z3Solver.solve(pathConstraint);
+        return new Z3Solver().solve(pathConstraint);
     }
 
     public String randomTC(List<Local> parameters) {
